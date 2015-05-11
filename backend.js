@@ -1,4 +1,5 @@
-var pg = require('pg.js');
+var pg = require('pg.js'),
+    csp = require('js-csp');
 
 module.exports = function createTodoBackend(connectionString) {
   function query(query, params, callback) {
@@ -21,9 +22,43 @@ module.exports = function createTodoBackend(connectionString) {
     });
   }
 
+  function cquery(query, params) {
+    var resultChan = csp.chan();
+    var errChan = csp.chan();
+
+    pg.connect(connectionString, function(err, client, done) {
+      done();
+
+      if (err) {
+        csp.go(function* (){
+          yield csp.put(errChan, err);
+        });
+        return;
+      }
+
+      client.query(query, params, function(err, result) {
+        if (err) {
+          csp.go(function* (){
+            yield csp.put(errChan, err);
+          });
+          return;
+        }
+
+        csp.go(function* (){
+          yield csp.put(resultChan, result.rows);
+        });
+      });
+    });
+
+    return resultChan;
+  }
+
   return {
     all: function(callback) {
-      query('SELECT * FROM todos', [], callback);
+      var result = cquery('SELECT * FROM todos', []);
+      csp.go(function* (){
+        callback(null, yield result);
+      });
     },
 
     get: function(id, callback) {
