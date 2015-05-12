@@ -3,29 +3,9 @@ var pg = require('pg.js'),
     transducers = require("transducers.js");
 
 module.exports = function createTodoBackend(connectionString) {
-  function query(query, params, callback) {
-    pg.connect(connectionString, function(err, client, done) {
-      done();
-
-      if (err) {
-        callback(err);
-        return;
-      }
-
-      client.query(query, params, function(err, result) {
-        if (err) {
-          callback(err);
-          return;
-        }
-
-        callback(null, result.rows);
-      });
-    });
-  }
-
-  function cquery(query, params, resultChan) {
-    var resultChan = resultChan || csp.chan();
-    var errChan = csp.chan();
+  function query(query, params, resultChan) {
+    var resultChan = resultChan || csp.chan(1);
+    var errChan = csp.chan(1);
 
     pg.connect(connectionString, function(err, client, done) {
       done();
@@ -56,17 +36,23 @@ module.exports = function createTodoBackend(connectionString) {
 
   return {
     all: function() {
-      return cquery('SELECT * FROM todos', []);
+      return query('SELECT * FROM todos', []);
     },
 
     get: function(id) {
-      return cquery('SELECT * FROM todos WHERE id = $1', [id], csp.chan(1, transducers.map(x => x[0])));
+      return query(
+        'SELECT * FROM todos WHERE id = $1',
+        [id],
+        csp.chan(1, transducers.map(x => x[0]))
+      );
     },
 
     create: function(title, order) {
-      return cquery('INSERT INTO todos ("title", "order", "completed") VALUES ($1, $2, false) RETURNING *',
-                    [title, order],
-                    csp.chan(1, transducers.map(x => x[0])));
+      return query(
+        'INSERT INTO todos ("title", "order", "completed") VALUES ($1, $2, false) RETURNING *',
+        [title, order],
+        csp.chan(1, transducers.map(x => x[0]))
+      );
     },
 
     update: function(id, properties) {
@@ -91,19 +77,23 @@ module.exports = function createTodoBackend(connectionString) {
         'RETURNING *'
       ];
 
-      return cquery(updateQuery.join(' '),
-                    values.concat([id]),
-                    csp.chan(1, transducers.map(x => x[0])));
+      return query(
+        updateQuery.join(' '),
+        values.concat([id]),
+        csp.chan(1, transducers.map(x => x[0]))
+      );
     },
 
     delete: function(id) {
-      return cquery('DELETE FROM todos WHERE id = $1 RETURNING *',
-                    [id],
-                    csp.chan(1, transducers.map(x => x[0])));
+      return query(
+        'DELETE FROM todos WHERE id = $1 RETURNING *',
+        [id],
+        csp.chan(1, transducers.map(x => x[0]))
+      );
     },
 
     clear: function() {
-      return cquery('DELETE FROM todos RETURNING *', []);
+      return query('DELETE FROM todos RETURNING *', []);
     }
   };
 };
