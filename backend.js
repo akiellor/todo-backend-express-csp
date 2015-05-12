@@ -34,24 +34,23 @@ module.exports = function createTodoBackend(connectionString) {
     return [errChan, resultChan];
   }
 
+  function querySingle(queryString, params) {
+    return query(queryString, params, csp.chan(1, transducers.map(x => x[0])));
+  }
+
   return {
     all: function() {
       return query('SELECT * FROM todos', []);
     },
 
     get: function(id) {
-      return query(
-        'SELECT * FROM todos WHERE id = $1',
-        [id],
-        csp.chan(1, transducers.map(x => x[0]))
-      );
+      return querySingle('SELECT * FROM todos WHERE id = $1', [id]);
     },
 
     create: function(title, order) {
-      return query(
+      return querySingle(
         'INSERT INTO todos ("title", "order", "completed") VALUES ($1, $2, false) RETURNING *',
-        [title, order],
-        csp.chan(1, transducers.map(x => x[0]))
+        [title, order]
       );
     },
 
@@ -77,19 +76,11 @@ module.exports = function createTodoBackend(connectionString) {
         'RETURNING *'
       ];
 
-      return query(
-        updateQuery.join(' '),
-        values.concat([id]),
-        csp.chan(1, transducers.map(x => x[0]))
-      );
+      return querySingle(updateQuery.join(' '), values.concat([id]));
     },
 
     delete: function(id) {
-      return query(
-        'DELETE FROM todos WHERE id = $1 RETURNING *',
-        [id],
-        csp.chan(1, transducers.map(x => x[0]))
-      );
+      return querySingle('DELETE FROM todos WHERE id = $1 RETURNING *', [id]);
     },
 
     clear: function() {
