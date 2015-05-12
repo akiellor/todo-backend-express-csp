@@ -50,15 +50,12 @@ module.exports = function createTodoBackend(connectionString) {
       });
     });
 
-    return resultChan;
+    return [errChan, resultChan];
   }
 
   return {
-    all: function(callback) {
-      var result = cquery('SELECT * FROM todos', []);
-      csp.go(function* (){
-        callback(null, yield result);
-      });
+    all: function() {
+      return cquery('SELECT * FROM todos', []);
     },
 
     get: function(id, callback) {

@@ -1,5 +1,6 @@
 var app = require('express')(),
     bodyParser = require('body-parser'),
+    csp = require('js-csp'),
     backend = require('./backend');
 
 // ----- Parse JSON requests
@@ -45,10 +46,24 @@ function getCreateTodo(req) {
   };
 }
 
-app.get('/', function(req, res) {
-  todos.all(createCallback(res, function(todos) {
-    res.send(todos.map(getCreateTodo(req)));
-  }));
+function get(route, gen) {
+  app.get(route, function(req, res) {
+    csp.go(gen, [req, res]);
+  });
+}
+
+get('/', function* (req, res) {
+  var r = todos.all(),
+      err = r[0],
+      all = r[1];
+
+  var result = yield csp.alts([err, all]);
+
+  if (result.channel === err) {
+    res.send(500, err);
+  } else if (result.channel === all) {
+    res.send(result.value.map(getCreateTodo(req)));
+  }
 });
 
 app.get('/:id', function(req, res) {
